@@ -57,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         file.addItem(.separator())
         add(file, "保存", #selector(NSDocument.save(_:)), key: "s")
         add(file, "另存为…", #selector(NSDocument.saveAs(_:)), key: "s", modifiers: [.command, .shift])
+        add(file, "导出为 PDF…", #selector(EditorWindowController.exportPDF(_:)))
         file.addItem(.separator())
         add(file, "关闭窗口", #selector(NSWindow.performClose(_:)), key: "w")
 

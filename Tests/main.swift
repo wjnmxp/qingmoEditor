@@ -1,4 +1,5 @@
 import AppKit
+import PDFKit
 
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
@@ -386,5 +387,34 @@ if let address = ProcessInfo.processInfo.environment["QINGMO_IMAGE_TEST_URL"], l
           "Removed images cancel loading and late responses cannot restore stale previews")
 }
 
+
+
+// Exercise the export job, including assets that no editor window has rendered.
+let pdfSource = "# 导出测试\n\n**中文正文**与可选中文字。\n\n"
+    + "![测试图片](<中文 图片(1).png>)\n\n"
+    + "| 项目编号 | 说明 | 金额 |\n| --- | --- | ---: |\n"
+    + (1...60).map { "| RECORD\($0)END | 表格内容 | \($0).00 |\n" }.joined()
+    + "\n导出结束标记\n"
+let pdfSnapshot = MarkdownSnapshot(pdfSource, baseURL: directory)
+let pdfURL = directory.appendingPathComponent("PDF export.pdf")
+let pdfJob = PDFExportJob(snapshot: pdfSnapshot, title: "导出测试", destination: pdfURL)
+var pdfResult: Result<Void, Error>?
+pdfJob.start { pdfResult = $0 }
+for _ in 0..<30 where pdfResult == nil { settle() }
+check(pdfResult != nil, "PDF export completes after loading a local image")
+try pdfResult!.get()
+let exported = PDFDocument(url: pdfURL)!
+let pageText = (0..<exported.pageCount).map { index in
+    (exported.page(at: index)?.string ?? "").precomposedStringWithCompatibilityMapping
+        .filter { !$0.isWhitespace }
+}
+let pdfText = pageText.joined(separator: "\n")
+check(exported.pageCount >= 3 && pdfText.contains("中文正文") && pdfText.contains("导出结束标记"),
+      "PDF paginates the full document with selectable Chinese text")
+check((1...60).allSatisfy { pdfText.contains("RECORD\($0)END") } &&
+      pageText.filter { $0.contains("项目编号") }.count >= 3,
+      "PDF includes every table row and repeats the header across pages")
+check(!pdfText.contains("**") && !pdfText.contains("图片无法加载") && !pdfText.contains("中文 图片(1).png"),
+      "PDF resolves the local image and hides Markdown syntax")
 
 print("SUCCESS: \(checks) checks")

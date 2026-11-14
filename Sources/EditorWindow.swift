@@ -123,6 +123,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSTa
     private(set) var imagePresentation: ImageCoordinator!
     private var applying = false
     private var deferredStyle: DispatchWorkItem?
+    private var pdfExport: PDFExportJob?
     private var size = MarkdownAppearance.defaultSize
     private var isSidebarVisible = true
     private var characterCount = 0
@@ -384,6 +385,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSTa
 
     private func updateStatus() {
         stats.stringValue = "即时预览  ·  \(characterCount) 字符  ·  \(snapshot.headings.count) 个标题"
+        if pdfExport != nil { state.stringValue = "正在导出 PDF…"; return }
         if let doc = markdownDocument {
             if doc.fileURL == nil { state.stringValue = "未命名文档 · ⌘S 保存" }
             else { state.stringValue = "\(doc.codec.label) · \(doc.isDocumentEdited ? "待保存" : "已保存")" }
@@ -391,10 +393,36 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSTa
     }
 
     func windowDidUpdate(_ notification: Notification) { updateStatus() }
-    func windowWillClose(_ notification: Notification) { imagePresentation?.cancel() }
+    func windowWillClose(_ notification: Notification) {
+        imagePresentation?.cancel()
+        pdfExport = nil
+    }
     func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? { markdownDocument?.undoManager }
 
     @objc func save(_ sender: Any?) { markdownDocument?.save(sender) }
+
+    @objc func exportPDF(_ sender: Any?) {
+        guard let window, let document = markdownDocument, pdfExport == nil else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.directoryURL = document.fileURL?.deletingLastPathComponent()
+        panel.prompt = "导出"
+        panel.nameFieldStringValue = document.fileURL?.deletingPathExtension().lastPathComponent ?? document.displayName
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard response == .OK, let destination = panel.url, let self else { return }
+            let snapshot = MarkdownSnapshot(document.source, baseURL: document.fileURL?.deletingLastPathComponent())
+            let job = PDFExportJob(snapshot: snapshot, title: document.displayName, destination: destination)
+            self.pdfExport = job
+            self.updateStatus()
+            job.start { [weak self] result in
+                guard let self else { return }
+                self.pdfExport = nil
+                self.updateStatus()
+                if case .failure(let error) = result { self.window?.presentError(error) }
+            }
+        }
+    }
+
 
     @objc func toggleOutline(_ sender: Any?) {
         isSidebarVisible.toggle()
