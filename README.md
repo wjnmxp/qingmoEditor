@@ -19,6 +19,12 @@
 
 需要 Apple Silicon Mac、macOS 13 或更新版本、Xcode Command Line Tools 和 Python 3。
 
+**交给 Agent 自动构建打包**：把下面这行复制给你的 Agent，Codex、Claude Code 和 WorkBuddy 都可以。
+
+```text
+请帮我在本机的 Apple Silicon Mac 上构建并打包清墨。克隆 https://github.com/wjnmxp/qingmoEditor.git（已克隆就使用现有目录），阅读 README，检查 macOS、Python 3 和 Xcode Command Line Tools，然后在仓库根目录运行 `python3 build.py`。如果构建提示 macOS 26.4 SDK 缺少头文件，按 README 运行 `python3 tools/prepare_sdk.py` 后重试。完成后验证 `build/.staging/清墨.app` 的签名，并告诉我构建结果和 App 的绝对路径。
+```
+
 ```sh
 git clone https://github.com/wjnmxp/qingmoEditor.git
 cd qingmoEditor
